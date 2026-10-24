@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Password Cracking Simulation &amp; Defense</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <span class="header-icon">&#128274;</span>
+      <div>
+        <div class="header-title">Password Cracking Simulation &amp; Defense</div>
+        <div class="header-sub">SHA-256 &bull; Brute Force &bull; Dictionary Attack &bull; Defense System</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('register',this)">Register</button>
+      <button class="tab"        onclick="switchTab('database',this)">Database</button>
+      <button class="tab"        onclick="switchTab('brute',this)">Brute Force</button>
+      <button class="tab"        onclick="switchTab('dict',this)">Dictionary Attack</button>
+      <button class="tab"        onclick="switchTab('login',this)">Login</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="panel active" id="panel-register">
+      <div class="card">
+        <div class="sec-title">Create account &mdash; max 5-character password</div>
+        <div class="row">
+          <input type="text"     id="reg-user" placeholder="Username"               maxlength="20"/>
+          <input type="password" id="reg-pass" placeholder="Password (max 5 chars)" maxlength="5" oninput="liveStr()"/>
+          <button class="btn btn-success" onclick="registerUser()">Register</button>
+        </div>
+        <div class="str-bar"><div class="str-fill" id="reg-sf"></div></div>
+        <div class="str-label" id="reg-sl">Enter a password (1&ndash;5 characters)</div>
+        <div id="reg-msg" class="reg-msg"></div>
+      </div>
+
+      <div class="card">
+        <div class="sec-title">Quick-fill demo users</div>
+        <div class="demo-row">
+          <button class="btn" onclick="qf('alice','sun')">alice / sun</button>
+          <button class="btn" onclick="qf('bob','abc7')">bob / abc7</button>
+          <button class="btn" onclick="qf('carol','pass')">carol / pass</button>
+          <button class="btn" onclick="qf('dave','z9#mK')">dave / z9#mK</button>
+          <button class="btn" onclick="qf('eve','hi')">eve / hi</button>
+        </div>
+      </div>
+
+      <div class="card info-card">
+        Passwords are hashed using real <strong>SHA-256</strong> (Web Crypto API) with a random 8-byte hex salt.
+        The database stores only the salt and hash &mdash; never the plaintext.
+      </div>
+    </div>
+
+    <!-- DATABASE -->
+    <div class="panel" id="panel-database">
+      <div class="card">
+        <div class="sec-title">Simulated user database &mdash; SHA-256 hashed</div>
+        <div id="db-view"></div>
+      </div>
+      <div class="card info-card">
+        Each row stores: username, a random salt, and <code>SHA-256(password&nbsp;+&nbsp;salt)</code>.
+        Attackers who steal this table must crack every hash individually &mdash; they cannot reverse it.
+      </div>
+    </div>
+
+    <!-- BRUTE FORCE -->
+    <div class="panel" id="panel-brute">
+      <div class="card">
+        <div class="sec-title">Select target user</div>
+        <div class="target-sel" id="brute-targets">
+          <span class="no-users">No users yet &mdash; register some first.</span>
+        </div>
+        <div class="hint-box" id="brute-hint" style="display:none"></div>
+
+        <div class="sec-title" style="margin-top:1.1rem">Charset</div>
+        <div class="row">
+          <select id="brute-cs">
+            <option value="lower">a&ndash;z only</option>
+            <option value="lowernum" selected>a&ndash;z + 0&ndash;9</option>
+            <option value="alnum">a&ndash;z + A&ndash;Z + 0&ndash;9</option>
+            <option value="full">a&ndash;z + A&ndash;Z + 0&ndash;9 + symbols</option>
+          </select>
+          <span class="hint-text">(works best on passwords up to ~4 chars)</span>
+        </div>
+        <div class="row">
+          <button class="btn btn-danger" onclick="startBrute()">&#9658; Start brute force</button>
+          <button class="btn"            onclick="stopBrute()">&#9632; Stop</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-l">Attempts</div><div class="stat-v" id="ba-att">0</div></div>
+          <div class="stat"><div class="stat-l">Current guess</div><div class="stat-v sm" id="ba-cur">&#8212;</div></div>
+          <div class="stat"><div class="stat-l">Speed</div><div class="stat-v" id="ba-spd">&#8212;</div></div>
+          <div class="stat"><div class="stat-l">Time</div><div class="stat-v" id="ba-time">0s</div></div>
+        </div>
+        <div class="pbar-wrap"><div class="pbar" id="ba-bar"></div></div>
+        <div class="log" id="ba-log"><span class="li">Select a target and click Start.</span></div>
+        <div class="banner" id="ba-banner"></div>
+      </div>
+      <div class="card info-card">
+        <strong>How it works:</strong> Every possible character combination is tried. The computed
+        <code>SHA-256(guess + salt)</code> is compared to the stored hash. No plaintext is ever seen.
+      </div>
+    </div>
+
+    <!-- DICTIONARY -->
+    <div class="panel" id="panel-dict">
+      <div class="card">
+        <div class="sec-title">Select target user</div>
+        <div class="target-sel" id="dict-targets">
+          <span class="no-users">No users yet &mdash; register some first.</span>
+        </div>
+        <div class="hint-box" id="dict-hint" style="display:none"></div>
+
+        <div class="sec-title" style="margin-top:1.1rem">Wordlist (&le; 5 chars)</div>
+        <div id="dict-chips" class="chips-wrap"></div>
+
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn btn-danger" onclick="startDict()">&#9658; Start dictionary attack</button>
+          <button class="btn"            onclick="stopDict()">&#9632; Stop</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-l">Attempts</div><div class="stat-v" id="da-att">0</div></div>
+          <div class="stat"><div class="stat-l">Testing</div><div class="stat-v sm" id="da-cur">&#8212;</div></div>
+          <div class="stat"><div class="stat-l">List size</div><div class="stat-v" id="da-size">&#8212;</div></div>
+        </div>
+        <div class="pbar-wrap"><div class="pbar" id="da-bar"></div></div>
+        <div class="log" id="da-log"><span class="li">Select a target and click Start.</span></div>
+        <div class="banner" id="da-banner"></div>
+      </div>
+      <div class="card info-card">
+        <strong>How it works:</strong> Common words are tried one-by-one. Each word is hashed with the target's salt
+        and compared &mdash; far faster than brute force for weak, common passwords.
+      </div>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="panel" id="panel-login">
+      <div class="card">
+        <div class="sec-title">Defense layers</div>
+        <div id="def-grid" class="def-grid"></div>
+      </div>
+      <div class="card">
+        <div class="sec-title">Simulate login attempt</div>
+        <div class="row">
+          <select id="def-usel"></select>
+          <input type="password" id="def-pass" placeholder="Guess password&hellip;" maxlength="5"/>
+          <button class="btn btn-info" onclick="defLogin()">Try login</button>
+          <button class="btn"          onclick="defReset()">Reset lockouts</button>
+        </div>
+        <div class="log" id="def-log">
+          <span class="li">Defense system active. Try guessing a registered user's password.</span>
+        </div>
+      </div>
+      <div class="card info-card">
+        Login re-hashes the guess with the stored salt and compares SHA-256 digests.
+        Even if the database leaks, passwords cannot be reversed from hashes alone.
+      </div>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
